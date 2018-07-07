@@ -21,12 +21,11 @@ public class DownloadS3 implements RequestHandler<Integer, String> {
         final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
         final String bucketName = "com.teppeis.sample.hello-lambda";
         final String key = "closure.tgz";
-        try {
-            S3Object o = s3.getObject(bucketName, key);
-            S3ObjectInputStream s3is = o.getObjectContent();
+        try (S3Object o = s3.getObject(bucketName, key);
+             S3ObjectInputStream s3is = o.getObjectContent();
+        ) {
             final Path tempDirectory = Files.createTempDirectory(Paths.get("/tmp"), null);
             Files.copy(s3is, tempDirectory.resolve(key));
-            s3is.close();
 //            Files.list(tempDirectory).forEach(System.out::println);
             return "success";
         } catch (AmazonServiceException e) {
