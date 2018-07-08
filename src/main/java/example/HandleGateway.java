@@ -1,6 +1,5 @@
 package example;
 
-import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
@@ -9,7 +8,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.S3Object;
-import com.google.gson.Gson;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
@@ -24,39 +23,53 @@ import java.nio.file.Paths;
 import java.util.Comparator;
 
 public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
-    final Gson gson = new Gson();
+    final ObjectMapper mapper = new ObjectMapper();
 
     @Override
+
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
         final String method = input.getHttpMethod().toUpperCase();
-        Response response;
-        switch (method) {
-            case "POST":
-                final Request request = gson.fromJson(input.getBody(), Request.class);
-                response = handlePost(request, context);
-                break;
-            default:
-                throw new UnsupportedOperationException("Unsupported Method: " + method);
-        }
         final APIGatewayProxyResponseEvent responseEvent = new APIGatewayProxyResponseEvent();
-        responseEvent.setStatusCode(200);
-        responseEvent.setBody(gson.toJson(response));
-        return responseEvent;
+        try {
+            switch (method) {
+                case "POST":
+                    Request request = mapper.readValue(input.getBody(), Request.class);
+                    Response response = handlePost(request, context);
+                    responseEvent.setStatusCode(200);
+                    responseEvent.setBody(mapper.writeValueAsString(response));
+                    break;
+                default:
+                    throw new UnsupportedOperationException("Unsupported Method: " + method);
+            }
+            return responseEvent;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private Response handlePost(Request request, Context context) {
+        try {
+            final Path targetDir = Files.createTempDirectory(Paths.get("/tmp"), null);
+//            Files.list(Paths.get("/tmp")).forEach(System.out::println);
+            final Response response = extractFromS3(targetDir, request.getKey(), context);
+            this.cleanup(targetDir);
+            return response;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Response extractFromS3(Path targetDir, final String key, Context context) throws IOException {
         final LambdaLogger logger = context.getLogger();
         final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
         final String bucketName = System.getenv("BUCKET_NAME");
         logger.log("bucketName: " + bucketName);
-        final String key = request.getKey();
         logger.log("key: " + key);
         try (S3Object s3o = s3.getObject(bucketName, key);
              InputStream s3i = s3o.getObjectContent();
              InputStream gzipi = new GzipCompressorInputStream(s3i);
              ArchiveInputStream i = new TarArchiveInputStream(gzipi);
         ) {
-            final Path targetDir = Files.createTempDirectory(Paths.get("/tmp"), null);
 
             logger.log("start extracting");
             ArchiveEntry entry = null;
@@ -79,17 +92,7 @@ public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent
                 }
             }
             logger.log("extracted");
-
-            this.cleanup(targetDir);
-//            Files.list(Paths.get("/tmp")).forEach(System.out::println);
-
             return new Response("success");
-        } catch (AmazonServiceException e) {
-            System.err.println(e.getErrorMessage());
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            System.err.println(e.getMessage());
-            throw new RuntimeException(e);
         }
     }
 
