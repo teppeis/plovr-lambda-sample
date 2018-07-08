@@ -18,13 +18,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-public class ExtractTgz implements RequestHandler<Integer, String> {
+public class ExtractTgz implements RequestHandler<Request, Response> {
     @Override
-    public String handleRequest(Integer input, Context context) {
+    public Response handleRequest(Request input, Context context) {
         final LambdaLogger logger = context.getLogger();
         final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
-        final String bucketName = "com.teppeis.sample.hello-lambda";
-        final String key = "closure.tgz";
+        final String bucketName = System.getenv("BUCKET_NAME");
+        logger.log("bucketName: " + bucketName);
+        final String key = input.getKey();
+        logger.log("key: " + key);
         try (S3Object s3o = s3.getObject(bucketName, key);
              InputStream s3i = s3o.getObjectContent();
              InputStream gzipi = new GzipCompressorInputStream(s3i);
@@ -55,7 +57,7 @@ public class ExtractTgz implements RequestHandler<Integer, String> {
 
             logger.log("extracted");
             Files.list(Paths.get("/tmp")).forEach(System.out::println);
-            return "{}";
+            return new Response("success");
         } catch (AmazonServiceException e) {
             System.err.println(e.getErrorMessage());
             throw new RuntimeException(e);
