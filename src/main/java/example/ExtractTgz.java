@@ -32,36 +32,30 @@ public class ExtractTgz implements RequestHandler<Integer, String> {
         ) {
             final Path targetDir = Files.createTempDirectory(Paths.get("/tmp"), null);
 
-            ArchiveEntry entry = null;
             logger.log("start extracting");
+            ArchiveEntry entry = null;
             while ((entry = i.getNextEntry()) != null) {
                 if (!i.canReadEntryData(entry)) {
-                    // log something?
                     logger.log("cannot read entry data: " + entry);
                     continue;
                 }
                 final Path target = targetDir.resolve(entry.getName());
-//                logger.log("target: " + target);
                 if (entry.isDirectory()) {
-//                    logger.log("isDirectory");
                     if (!Files.isDirectory(target) && !target.toFile().mkdirs()) {
                         throw new IOException("failed to create directory " + target);
                     }
                 } else {
-//                    logger.log("isFile");
                     final Path parent = target.getParent();
                     if (!Files.isDirectory(parent) && !parent.toFile().mkdirs()) {
                         throw new IOException("failed to create directory " + parent);
                     }
-//                    logger.log("copying");
                     Files.copy(i, target);
-//                    logger.log("copied");
                 }
             }
 
             logger.log("extracted");
-            Files.list(targetDir).forEach(System.out::println);
-            return "success";
+            Files.list(Paths.get("/tmp")).forEach(System.out::println);
+            return "{}";
         } catch (AmazonServiceException e) {
             System.err.println(e.getErrorMessage());
             throw new RuntimeException(e);
