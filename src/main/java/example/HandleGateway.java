@@ -15,11 +15,13 @@ import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Comparator;
 
 public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
     final Gson gson = new Gson();
@@ -42,12 +44,12 @@ public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent
         return responseEvent;
     }
 
-    private Response handlePost(Request input, Context context) {
+    private Response handlePost(Request request, Context context) {
         final LambdaLogger logger = context.getLogger();
         final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
         final String bucketName = System.getenv("BUCKET_NAME");
         logger.log("bucketName: " + bucketName);
-        final String key = input.getKey();
+        final String key = request.getKey();
         logger.log("key: " + key);
         try (S3Object s3o = s3.getObject(bucketName, key);
              InputStream s3i = s3o.getObjectContent();
@@ -76,9 +78,11 @@ public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent
                     Files.copy(i, target);
                 }
             }
-
             logger.log("extracted");
-            Files.list(Paths.get("/tmp")).forEach(System.out::println);
+
+            this.cleanup(targetDir);
+//            Files.list(Paths.get("/tmp")).forEach(System.out::println);
+
             return new Response("success");
         } catch (AmazonServiceException e) {
             System.err.println(e.getErrorMessage());
@@ -87,5 +91,12 @@ public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent
             System.err.println(e.getMessage());
             throw new RuntimeException(e);
         }
+    }
+
+    private void cleanup(Path targetDir) throws IOException {
+        Files.walk(targetDir)
+                .sorted(Comparator.reverseOrder())
+                .map(Path::toFile)
+                .forEach(File::delete);
     }
 }
