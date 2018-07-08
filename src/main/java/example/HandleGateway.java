@@ -9,6 +9,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.S3Object;
+import com.google.gson.Gson;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
@@ -21,14 +22,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
+    final Gson gson = new Gson();
+
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
         final String method = input.getHttpMethod().toUpperCase();
         Response response;
         switch (method) {
             case "POST":
-                // TODO
-                final Request request = new Request("closure.tgz");
+                final Request request = gson.fromJson(input.getBody(), Request.class);
                 response = handlePost(request, context);
                 break;
             default:
@@ -36,9 +38,7 @@ public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent
         }
         final APIGatewayProxyResponseEvent responseEvent = new APIGatewayProxyResponseEvent();
         responseEvent.setStatusCode(200);
-        // TODO
-//        responseEvent.setBody(response.toString());
-        responseEvent.setBody("{\"result\": \"success\"}");
+        responseEvent.setBody(gson.toJson(response));
         return responseEvent;
     }
 
