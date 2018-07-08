@@ -27,8 +27,9 @@ dependencyManagement {
 }
 
 dependencies {
-    compile (
+    compile(
             'com.amazonaws:aws-lambda-java-core:1.2.0',
+            'com.amazonaws:aws-lambda-java-events:2.2.2',
             'com.amazonaws:aws-java-sdk-s3',
             'org.apache.commons:commons-compress:1.17',
     )
