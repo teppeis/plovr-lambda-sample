@@ -1,24 +1,19 @@
+plugins {
+    id 'java'
+    id 'io.spring.dependency-management' version '1.0.5.RELEASE'
+    id 'de.undercouch.download' version '3.4.3'
+}
+
 group 'example'
 version '1.0-SNAPSHOT'
 
-apply plugin: 'java'
-
 sourceCompatibility = 1.8
+def externalLibs = 'build/external-libs'
+def plovrJar = "${externalLibs}/plovr.jar"
 
 repositories {
     mavenCentral()
 }
-
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath "io.spring.gradle:dependency-management-plugin:1.0.3.RELEASE"
-    }
-}
-
-apply plugin: "io.spring.dependency-management"
 
 dependencyManagement {
     imports {
@@ -33,7 +28,7 @@ dependencies {
             'com.amazonaws:aws-java-sdk-s3',
             'org.apache.commons:commons-compress:1.17',
             'com.fasterxml.jackson.core:jackson-databind:2.9.6',
-            files('libs/plovr.jar'),
+            files(plovrJar),
     )
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }
@@ -46,4 +41,14 @@ task buildZip(type: Zip) {
     }
 }
 
+task downloadExternalLibs(type: Download) {
+    src 'https://github.com/teppeis/plovr/releases/download/v8.0.0-rc.1-reduce-gwt/plovr.jar'
+    dest {
+        new File(plovrJar).getParentFile().mkdirs()
+        return plovrJar
+    }
+    onlyIfModified true
+}
+
+buildZip.dependsOn downloadExternalLibs
 build.dependsOn buildZip
