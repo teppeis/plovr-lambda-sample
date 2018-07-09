@@ -50,5 +50,6 @@ task downloadExternalLibs(type: Download) {
     onlyIfModified true
 }
 
+compileJava.dependsOn downloadExternalLibs
 buildZip.dependsOn downloadExternalLibs
 build.dependsOn buildZip
