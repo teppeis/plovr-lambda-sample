@@ -1,0 +1,15 @@
+{
+  "name": "js",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Teppei Sato <teppeis@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "google-closure-compiler": "^20180610.0.2"
+  }
+}

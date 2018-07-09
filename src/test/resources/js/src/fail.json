@@ -1,0 +1,11 @@
+{
+  "id": "sample",
+  "paths": ".",
+  "inputs": "fail.js",
+  "pretty-print": true,
+  "language-in": "ECMASCRIPT_2017",
+  "language-out": "ECMASCRIPT5",
+  "treat-warnings-as-errors": true,
+  "level": "VERBOSE",
+  "mode": "ADVANCED"
+}
