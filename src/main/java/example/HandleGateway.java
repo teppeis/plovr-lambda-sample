@@ -129,7 +129,7 @@ public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent
         }
     }
 
-    static class Request {
+    private static class Request {
         private String key;
         private String targetConfigPath;
 
@@ -155,6 +155,25 @@ public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent
 
         public void setTargetConfigPath(String targetConfigPath) {
             this.targetConfigPath = targetConfigPath;
+        }
+    }
+
+    private static class Response {
+        private String result;
+
+        public Response() {
+        }
+
+        public Response(String result) {
+            this.result = result;
+        }
+
+        public String getResult() {
+            return result;
+        }
+
+        public void setResult(String result) {
+            this.result = result;
         }
     }
 }
