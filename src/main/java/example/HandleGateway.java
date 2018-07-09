@@ -13,6 +13,8 @@ import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
+import org.apache.http.HttpStatus;
+import org.plovr.cli.Command;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,40 +28,61 @@ public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent
     final ObjectMapper mapper = new ObjectMapper();
 
     @Override
-
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
         final String method = input.getHttpMethod().toUpperCase();
-        final APIGatewayProxyResponseEvent responseEvent = new APIGatewayProxyResponseEvent();
         try {
             switch (method) {
                 case "POST":
                     Request request = mapper.readValue(input.getBody(), Request.class);
-                    Response response = handlePost(request, context);
-                    responseEvent.setStatusCode(200);
-                    responseEvent.setBody(mapper.writeValueAsString(response));
-                    break;
+                    return handlePost(request, context);
                 default:
-                    throw new UnsupportedOperationException("Unsupported Method: " + method);
+                    final APIGatewayProxyResponseEvent responseEvent = new APIGatewayProxyResponseEvent();
+                    responseEvent.setStatusCode(HttpStatus.SC_METHOD_NOT_ALLOWED);
+                    return responseEvent;
             }
-            return responseEvent;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private Response handlePost(Request request, Context context) {
+    private APIGatewayProxyResponseEvent handlePost(Request request, Context context) {
+        final APIGatewayProxyResponseEvent responseEvent = new APIGatewayProxyResponseEvent();
+        Path targetDir = null;
         try {
-            final Path targetDir = Files.createTempDirectory(Paths.get("/tmp"), null);
+            targetDir = Files.createTempDirectory(Paths.get("/tmp"), null);
 //            Files.list(Paths.get("/tmp")).forEach(System.out::println);
-            final Response response = extractFromS3(targetDir, request.getKey(), context);
-            this.cleanup(targetDir);
-            return response;
+            extractFromS3(targetDir, request.getKey(), context);
+            final int status = compilePlovr(targetDir.resolve(request.getTargetConfigPath()));
+            final Response response;
+            if (status == 0) {
+                responseEvent.setStatusCode(HttpStatus.SC_OK);
+                response = new Response("success");
+            } else {
+                responseEvent.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+                response = new Response("error");
+            }
+            responseEvent.setBody(mapper.writeValueAsString(response));
+            return  responseEvent;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } finally {
+            if (targetDir != null) {
+                this.cleanup(targetDir);
+            }
+        }
+    }
+
+    private int compilePlovr(Path targetConfigPath) {
+        final Command command = Command.BUILD;
+        final String[] args = {targetConfigPath.toString()};
+        try {
+            return command.execute(args);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private Response extractFromS3(Path targetDir, final String key, Context context) throws IOException {
+    private void extractFromS3(Path targetDir, final String key, Context context) throws IOException {
         final LambdaLogger logger = context.getLogger();
         final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
         final String bucketName = System.getenv("BUCKET_NAME");
@@ -92,14 +115,46 @@ public class HandleGateway implements RequestHandler<APIGatewayProxyRequestEvent
                 }
             }
             logger.log("extracted");
-            return new Response("success");
         }
     }
 
-    private void cleanup(Path targetDir) throws IOException {
-        Files.walk(targetDir)
-                .sorted(Comparator.reverseOrder())
-                .map(Path::toFile)
-                .forEach(File::delete);
+    private void cleanup(Path targetDir) {
+        try {
+            Files.walk(targetDir)
+                    .sorted(Comparator.reverseOrder())
+                    .map(Path::toFile)
+                    .forEach(File::delete);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static class Request {
+        private String key;
+        private String targetConfigPath;
+
+        public Request() {
+        }
+
+        public Request(String key, String targetConfigPath) {
+            this.key = key;
+            this.targetConfigPath = targetConfigPath;
+        }
+
+        public String getKey() {
+            return key;
+        }
+
+        public void setKey(String key) {
+            this.key = key;
+        }
+
+        public String getTargetConfigPath() {
+            return targetConfigPath;
+        }
+
+        public void setTargetConfigPath(String targetConfigPath) {
+            this.targetConfigPath = targetConfigPath;
+        }
     }
 }

@@ -33,6 +33,7 @@ dependencies {
             'com.amazonaws:aws-java-sdk-s3',
             'org.apache.commons:commons-compress:1.17',
             'com.fasterxml.jackson.core:jackson-databind:2.9.6',
+            files('libs/plovr.jar'),
     )
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }
